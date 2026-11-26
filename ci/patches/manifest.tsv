@@ -4,7 +4,6 @@ ntsync-compat	5.15/ntsync_compat_android13-5.15.patch	1	3	yes	5.15 API compat fo
 ntsync-base	5.15/ntsync_base.patch	1	3	yes	NTSync driver/Kconfig/Makefile
 gki-ptrace	5.15/gki_ptrace.patch	1	3	yes	Kernel < 5.16 ptrace compatibility
 unicode-fix	5.15/unicode_bypass_fix_6.1-.patch	1	3	yes	Unicode bypass fix for < 6.1
-sus-map	5.15/xx_maps_sus_kernel.patch	1	3	yes	SUSFS sus_map support
 droidspaces-kabi	5.15/droidspaces/001-fix_sysvipc_kabi.patch	1	3	yes	DroidSpaces SysV IPC kABI fix (sublevels 6/7/8 range)
 droidspaces-userns	5.15/droidspaces/0002-guard-userns.patch	1	3	yes	DroidSpaces USER_NS guard
 droidspaces-ghosttask	5.15/droidspaces/0003-ghost-task.patch	1	3	yes	DroidSpaces ghost-task sentinel
