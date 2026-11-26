@@ -89,7 +89,8 @@ log "kernel ${MAJ}.${MIN}.${SUB}"
 # Helper: apply one patch, fail loudly on rejects (or warn for optional ones).
 # ---------------------------------------------------------------------------
 apply_patch() {
-  local label="$1" file="$2" strip="$3" fuzz="$4" required="$5" input="$file"
+  local label="$1" file="$2" strip="$3" fuzz="$4" required="$5"
+  local input="$file"
   [ -f "$file" ] || die "missing patch: $file"
 
   # Two performance patches need the 5.11-5.15 symbol form used upstream.
