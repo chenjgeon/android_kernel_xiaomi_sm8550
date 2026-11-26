@@ -85,6 +85,17 @@ log "kernel ${MAJ}.${MIN}.${SUB}"
 [ "${MAJ}.${MIN}" = "5.15" ] || die "this patch set targets 5.15, got ${MAJ}.${MIN}"
 [ "$SUB" -ge 150 ] || warn "sublevel $SUB is older than the recipes were tested against"
 
+# This fork ships stray *.rej files (e.g. under drivers/input/touchscreen/).
+# Snapshot them so reject checks only see files created by this run.
+BASELINE_REJECTS="$WORKSPACE/baseline-rejects.txt"
+CURRENT_REJECTS="$WORKSPACE/current-rejects.txt"
+find "$KERNEL_ROOT" -name '*.rej' -type f -print 2>/dev/null | LC_ALL=C sort > "$BASELINE_REJECTS"
+
+new_rejects() {
+  find "$KERNEL_ROOT" -name '*.rej' -type f -print 2>/dev/null | LC_ALL=C sort > "$CURRENT_REJECTS"
+  LC_ALL=C comm -13 "$BASELINE_REJECTS" "$CURRENT_REJECTS"
+}
+
 # ---------------------------------------------------------------------------
 # Helper: apply one patch, fail loudly on rejects (or warn for optional ones).
 # ---------------------------------------------------------------------------
@@ -118,11 +129,12 @@ apply_patch() {
   fi
 
   local rejects
-  rejects="$(find "$KERNEL_ROOT" -name '*.rej' -type f -print 2>/dev/null || true)"
+  rejects="$(new_rejects)"
   if [ -n "$rejects" ]; then
     printf '%s\n' "$rejects" >&2
-    find "$KERNEL_ROOT" -name '*.rej' -type f -delete 2>/dev/null || true
-    find "$KERNEL_ROOT" -name '*.orig' -type f -delete 2>/dev/null || true
+    while IFS= read -r rej; do
+      rm -f "$rej" "${rej%.rej}.orig"
+    done <<< "$rejects"
     if [ "$required" = yes ]; then
       die "required patch left rejects: $label"
     fi
@@ -237,7 +249,7 @@ else
   warn "CONFIG_FUSE_BPF is not declared in this tree; skipping"
 fi
 
-REJECTS="$(find "$KERNEL_ROOT" -name '*.rej' -type f -print 2>/dev/null || true)"
+REJECTS="$(new_rejects)"
 [ -z "$REJECTS" ] || { printf '%s\n' "$REJECTS" >&2; die "patch rejects remain in the kernel tree"; }
 
 log "feature stack applied to $KERNEL_ROOT"
