@@ -66,13 +66,28 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$TOOLCHAIN_DIR/clang"
-          curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
-            -o "$TOOLCHAIN_DIR/clang.tar.gz" \
-            https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android14-release/clang-r450784e.tar.gz
+          AOSP_URL="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android14-release/clang-r450784e.tar.gz"
+          MIRROR_URL="https://github.com/ravindu644/Android-Kernel-Tutorials/releases/download/toolchains/clang-r450784e.tar.gz"
+          download() {
+            curl -fL --retry 8 --retry-delay 10 --retry-all-errors \
+              --connect-timeout 30 --max-time 3600 -o "$1" "$2"
+          }
+          # Googlesource sometimes returns 503 for this archive; fall back to a
+          # byte-for-byte mirror hosted on GitHub Releases.
+          if ! download "$TOOLCHAIN_DIR/clang.tar.gz" "$AOSP_URL"; then
+            echo "::warning::AOSP archive download failed; falling back to the GitHub mirror"
+            rm -f "$TOOLCHAIN_DIR/clang.tar.gz"
+            download "$TOOLCHAIN_DIR/clang.tar.gz" "$MIRROR_URL"
+          fi
           tar -xzf "$TOOLCHAIN_DIR/clang.tar.gz" -C "$TOOLCHAIN_DIR/clang"
-          echo "CLANG_BIN=$TOOLCHAIN_DIR/clang/bin" >> "$GITHUB_ENV"
+          # The mirror tarball may contain a top-level clang-r450784e/ directory.
+          CLANG_BIN="$(dirname "$(find "$TOOLCHAIN_DIR/clang" -type f -path '*/bin/clang' -print -quit)")"
+          [ -n "$CLANG_BIN" ] && [ -x "$CLANG_BIN/clang" ] || {
+            echo "clang executable not found in downloaded archive" >&2; exit 1
+          }
+          echo "CLANG_BIN=$CLANG_BIN" >> "$GITHUB_ENV"
           echo "BINUTILS_BIN=/usr/bin" >> "$GITHUB_ENV"
-          "$TOOLCHAIN_DIR/clang/bin/clang" --version | head -n 1
+          "$CLANG_BIN/clang" --version | head -n 1
 
       - name: Build pahole 1.31 for BTF generation
         run: |
