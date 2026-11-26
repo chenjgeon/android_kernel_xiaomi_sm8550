@@ -1,150 +1,63 @@
-# How do I submit patches to Android Common Kernels
+# Vermeer kernel feature stack (CI recipe)
 
-1. BEST: Make all of your changes to upstream Linux. If appropriate, backport to the stable releases.
-   These patches will be merged automatically in the corresponding common kernels. If the patch is already
-   in upstream Linux, post a backport of the patch that conforms to the patch requirements below.
-   - Do not send patches upstream that contain only symbol exports. To be considered for upstream Linux,
-additions of `EXPORT_SYMBOL_GPL()` require an in-tree modular driver that uses the symbol -- so include
-the new driver or changes to an existing driver in the same patchset as the export.
-   - When sending patches upstream, the commit message must contain a clear case for why the patch
-is needed and beneficial to the community. Enabling out-of-tree drivers or functionality is not
-not a persuasive case.
+This directory is a drop-in addition for `chenjgeon/android_kernel_xiaomi_sm8550`
+(`lineage-24.0`, Linux 5.15.223, Poco F6 Pro / vermeer). It does **not** modify
+kernel source in place locally; a GitHub Actions workflow applies everything on
+a fresh checkout and publishes an AnyKernel3 ZIP.
 
-2. LESS GOOD: Develop your patches out-of-tree (from an upstream Linux point-of-view). Unless these are
-   fixing an Android-specific bug, these are very unlikely to be accepted unless they have been
-   coordinated with kernel-team@android.com. If you want to proceed, post a patch that conforms to the
-   patch requirements below.
+## What is included
 
-# Common Kernel patch requirements
+| Group | Implementation |
+|---|---|
+| KernelSU-Next | `KernelSU-Next/KernelSU-Next` @ `3660779e` (dev tip tracked by the upstream 5.15 recipe), linked into `drivers/kernelsu` |
+| SUSFS4KSU | `simonpunk/susfs4ksu` @ `c1d1da42` on `gki-android13-5.15`; 5.15 `i_user_ns` compat + credential-helper guard |
+| NoMount | `maxsteeel/nomount` @ `c803cbf0`; `fs/nomount` symlink + `CONFIG_NOMOUNT=y` |
+| Mountify | userspace companion (not kernel-side; install the module on device) |
+| Baseband Guard | `vc-teahouse/Baseband-guard` @ `48d9fde`; LSM enabled with `baseband_guard` in `CONFIG_LSM` |
+| Networking | ipset, netfilter helpers/REJECT, WireGuard, FQ/FQ-CoDel/CAKE |
+| BBRv3 | 5.15 backport patch + `CONFIG_TCP_CONG_BBR3=y` |
+| TMPFS | `CONFIG_TMPFS_XATTR` + POSIX ACLs |
+| BPF / eBPF / FUSE-BPF | `CONFIG_DEBUG_INFO_BTF`, BPF events, `CONFIG_FUSE_BPF` when declared, pahole 1.31 |
+| NTSync | 5.15 compat patch + `ntsync_base.patch` + `CONFIG_NTSYNC=y` |
+| Performance | optional 5.15-adapted upstream performance patch set |
+| DroidSpaces | kABI fix + USER_NS guard + ghost-task patch + namespace/overlay/xattr configs |
+| Hardening | `gki_ptrace.patch` and `unicode_bypass_fix_6.1-.patch` for < 5.16 / < 6.1 |
 
-- All patches must conform to the Linux kernel coding standards and pass `scripts/checkpatch.pl`
-- Patches shall not break gki_defconfig or allmodconfig builds for arm, arm64, x86, x86_64 architectures
-(see  https://source.android.com/setup/build/building-kernels)
-- If the patch is not merged from an upstream branch, the subject must be tagged with the type of patch:
-`UPSTREAM:`, `BACKPORT:`, `FROMGIT:`, `FROMLIST:`, or `ANDROID:`.
-- All patches must have a `Change-Id:` tag (see https://gerrit-review.googlesource.com/Documentation/user-changeid.html)
-- If an Android bug has been assigned, there must be a `Bug:` tag.
-- All patches must have a `Signed-off-by:` tag by the author and the submitter
+## How to install into your fork
 
-Additional requirements are listed below based on patch type
+Copy the contents of this directory into the **root of your kernel fork**:
 
-## Requirements for backports from mainline Linux: `UPSTREAM:`, `BACKPORT:`
+- `.github/workflows/build-kernel.yml` → `.github/workflows/build-kernel.yml`
+- `ci/` → `ci/` (patches, config fragments, scripts, AnyKernel3 template)
 
-- If the patch is a cherry-pick from Linux mainline with no changes at all
-    - tag the patch subject with `UPSTREAM:`.
-    - add upstream commit information with a `(cherry picked from commit ...)` line
-    - Example:
-        - if the upstream commit message is
-```
-        important patch from upstream
+Then commit and push to `lineage-24.0`:
 
-        This is the detailed description of the important patch
-
-        Signed-off-by: Fred Jones <fred.jones@foo.org>
-```
->- then Joe Smith would upload the patch for the common kernel as
-```
-        UPSTREAM: important patch from upstream
-
-        This is the detailed description of the important patch
-
-        Signed-off-by: Fred Jones <fred.jones@foo.org>
-
-        Bug: 135791357
-        Change-Id: I4caaaa566ea080fa148c5e768bb1a0b6f7201c01
-        (cherry picked from commit c31e73121f4c1ec41143423ac6ce3ce6dafdcec1)
-        Signed-off-by: Joe Smith <joe.smith@foo.org>
+```bash
+git add .github/workflows/build-kernel.yml ci
+git commit -m "CI: build vermeer GKI kernel with KernelSU-Next/SUSFS feature stack"
+git push origin lineage-24.0
 ```
 
-- If the patch requires any changes from the upstream version, tag the patch with `BACKPORT:`
-instead of `UPSTREAM:`.
-    - use the same tags as `UPSTREAM:`
-    - add comments about the changes under the `(cherry picked from commit ...)` line
-    - Example:
-```
-        BACKPORT: important patch from upstream
+Trigger the workflow from the Actions tab ("Run workflow"), or push a `v*` tag.
 
-        This is the detailed description of the important patch
+## What the workflow does
 
-        Signed-off-by: Fred Jones <fred.jones@foo.org>
+1. Checks out the fork.
+2. Installs build deps + GNU AArch64/ARM32 binutils.
+3. Downloads AOSP Clang **r450784e** (the version pinned in `build.config.constants`) and builds pahole 1.31 for BTF.
+4. Applies vendored 5.15 patches (required) and optional performance patches, then integrates KernelSU-Next, SUSFS, NoMount and BBG at pinned commits.
+5. Creates `.config` from `gki_defconfig` + `arch/arm64/configs/vendor/vermeer_GKI.config` + `ci/config/*.fragment`.
+6. Builds `Image.gz`, modules and DTBs with Clang 14.
+7. Packages an AnyKernel3 ZIP (boot kernel only) plus raw artifacts into a GitHub Release.
 
-        Bug: 135791357
-        Change-Id: I4caaaa566ea080fa148c5e768bb1a0b6f7201c01
-        (cherry picked from commit c31e73121f4c1ec41143423ac6ce3ce6dafdcec1)
-        [joe: Resolved minor conflict in drivers/foo/bar.c ]
-        Signed-off-by: Joe Smith <joe.smith@foo.org>
-```
+## Important caveats
 
-## Requirements for other backports: `FROMGIT:`, `FROMLIST:`,
+- The patch recipes come from `WildKernels/kernel_patches` / `GKI_KernelSU_SUSFS`. Upstream's 5.15 matrix stops before sublevel **223**, so context drift is possible. Required patches are applied with `--fuzz=3` and fail the job on rejects; fix the affected patch or adjust the manifest line if that happens.
+- The AnyKernel3 script intentionally patches **boot only**. Keep vendor_boot (DTBs/modules/ramdisk) from your ROM. Verify offsets on-device before flashing.
+- `CONFIG_LSM` changes and GKI KMI symbol changes may break vendor module loading on some ROMs. Test on a disposable slot with a backup.
+- No local kernel build was performed while preparing these files (Windows host, no Linux build environment). Validate the first CI run carefully.
 
-- If the patch has been merged into an upstream maintainer tree, but has not yet
-been merged into Linux mainline
-    - tag the patch subject with `FROMGIT:`
-    - add info on where the patch came from as `(cherry picked from commit <sha1> <repo> <branch>)`. This
-must be a stable maintainer branch (not rebased, so don't use `linux-next` for example).
-    - if changes were required, use `BACKPORT: FROMGIT:`
-    - Example:
-        - if the commit message in the maintainer tree is
-```
-        important patch from upstream
+## Updating pins
 
-        This is the detailed description of the important patch
-
-        Signed-off-by: Fred Jones <fred.jones@foo.org>
-```
->- then Joe Smith would upload the patch for the common kernel as
-```
-        FROMGIT: important patch from upstream
-
-        This is the detailed description of the important patch
-
-        Signed-off-by: Fred Jones <fred.jones@foo.org>
-
-        Bug: 135791357
-        (cherry picked from commit 878a2fd9de10b03d11d2f622250285c7e63deace
-         https://git.kernel.org/pub/scm/linux/kernel/git/foo/bar.git test-branch)
-        Change-Id: I4caaaa566ea080fa148c5e768bb1a0b6f7201c01
-        Signed-off-by: Joe Smith <joe.smith@foo.org>
-```
-
-
-- If the patch has been submitted to LKML, but not accepted into any maintainer tree
-    - tag the patch subject with `FROMLIST:`
-    - add a `Link:` tag with a link to the submittal on lore.kernel.org
-    - add a `Bug:` tag with the Android bug (required for patches not accepted into
-a maintainer tree)
-    - if changes were required, use `BACKPORT: FROMLIST:`
-    - Example:
-```
-        FROMLIST: important patch from upstream
-
-        This is the detailed description of the important patch
-
-        Signed-off-by: Fred Jones <fred.jones@foo.org>
-
-        Bug: 135791357
-        Link: https://lore.kernel.org/lkml/20190619171517.GA17557@someone.com/
-        Change-Id: I4caaaa566ea080fa148c5e768bb1a0b6f7201c01
-        Signed-off-by: Joe Smith <joe.smith@foo.org>
-```
-
-## Requirements for Android-specific patches: `ANDROID:`
-
-- If the patch is fixing a bug to Android-specific code
-    - tag the patch subject with `ANDROID:`
-    - add a `Fixes:` tag that cites the patch with the bug
-    - Example:
-```
-        ANDROID: fix android-specific bug in foobar.c
-
-        This is the detailed description of the important fix
-
-        Fixes: 1234abcd2468 ("foobar: add cool feature")
-        Change-Id: I4caaaa566ea080fa148c5e768bb1a0b6f7201c01
-        Signed-off-by: Joe Smith <joe.smith@foo.org>
-```
-
-- If the patch is a new feature
-    - tag the patch subject with `ANDROID:`
-    - add a `Bug:` tag with the Android bug (required for android-specific features)
-
+Edit the defaults at the top of `ci/scripts/apply-patches.sh`, or override via repository variables/environment:
+`KSU_COMMIT`, `SUSFS_COMMIT`, `NOMOUNT_COMMIT`, `BBG_COMMIT`.

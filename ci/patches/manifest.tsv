@@ -1,0 +1,36 @@
+# name	path	pstrip	fuzz	required	note
+bbrv3	5.15/0001-bbrv3-android13-5.15.patch	1	3	yes	BBRv3 backport for android13-5.15
+ntsync-compat	5.15/ntsync_compat_android13-5.15.patch	1	3	yes	5.15 API compat for ntsync
+ntsync-base	5.15/ntsync_base.patch	1	3	yes	NTSync driver/Kconfig/Makefile
+gki-ptrace	5.15/gki_ptrace.patch	1	3	yes	Kernel < 5.16 ptrace compatibility
+unicode-fix	5.15/unicode_bypass_fix_6.1-.patch	1	3	yes	Unicode bypass fix for < 6.1
+sus-map	5.15/xx_maps_sus_kernel.patch	1	3	yes	SUSFS sus_map support
+droidspaces-kabi	5.15/droidspaces/001-fix_sysvipc_kabi.patch	1	3	yes	DroidSpaces SysV IPC kABI fix (sublevels 6/7/8 range)
+droidspaces-userns	5.15/droidspaces/0002-guard-userns.patch	1	3	yes	DroidSpaces USER_NS guard
+droidspaces-ghosttask	5.15/droidspaces/0003-ghost-task.patch	1	3	yes	DroidSpaces ghost-task sentinel
+perf-optimized-mem	5.15/performance/optimized_mem_operations.patch	1	3	no	Optional performance stack
+perf-file-align	5.15/performance/file_struct_8bytes_align.patch	1	3	no	Optional performance stack
+perf-cache-pressure	5.15/performance/reduce_cache_pressure.patch	1	3	no	Optional performance stack
+perf-mem-prefetch	5.15/performance/mem_opt_prefetch.patch	1	3	no	Optional performance stack
+perf-memcmp	5.15/performance/optimise_memcmp.patch	1	3	no	Optional; 5.15 needs symbol rename (see apply-patches.sh)
+perf-wakeup	5.15/performance/minimise_wakeup_time.patch	1	3	no	Optional performance stack
+perf-int-sqrt	5.15/performance/int_sqrt.patch	1	3	no	Optional performance stack
+perf-gc-sleep	5.15/performance/reduce_gc_thread_sleep_time.patch	1	3	no	Optional performance stack
+perf-wakelocks	5.15/performance/add_timeout_wakelocks_globally.patch	1	3	no	Optional performance stack
+perf-f2fs-congestion	5.15/performance/f2fs_reduce_congestion.patch	1	3	no	Optional performance stack
+perf-freeze-timeout	5.15/performance/reduce_freeze_timeout.patch	1	3	no	Optional performance stack
+perf-clear-page	5.15/performance/clear_page_16bytes_align.patch	1	3	no	Optional; 5.15 needs symbol rename (see apply-patches.sh)
+perf-s2idle	5.15/performance/avoid_extra_s2idle_wake_attempts.patch	1	3	no	Optional performance stack
+perf-hot-buddy	5.15/performance/disable_cache_hot_buddy.patch	1	3	no	Optional performance stack
+perf-f2fs-fsync	5.15/performance/f2fs_enlarge_min_fsync_blocks.patch	1	3	no	Optional performance stack
+perf-ext4-commit	5.15/performance/increase_ext4_default_commit_age.patch	1	3	no	Optional performance stack
+perf-skb-packets	5.15/performance/increase_sk_mem_packets.patch	1	3	no	Optional performance stack
+perf-pci-pme	5.15/performance/reduce_pci_pme_wakeups.patch	1	3	no	Optional performance stack
+perf-irq-logspam	5.15/performance/silence_irq_cpu_logspam.patch	1	3	no	Optional performance stack
+perf-sys-logspam	5.15/performance/silence_system_logspam.patch	1	3	no	Optional performance stack
+perf-min-freq	5.15/performance/add_limitation_scaling_min_freq.patch	1	3	no	Optional performance stack
+perf-cpu-scan	5.15/performance/adjust_cpu_scan_order.patch	1	3	no	Optional performance stack
+perf-tcp-nodelay	5.15/performance/force_tcp_nodelay.patch	1	3	no	Optional performance stack
+perf-ipv6-nat	5.15/performance/IPv6_NAT_FIX.patch	1	3	no	Optional performance stack
+perf-scaling-min	5.15/performance/re_write_limitation_scaling_min_freq.patch	1	3	no	Optional performance stack
+perf-unlikely	5.15/performance/use_unlikely_wrap_cpufreq.patch	1	3	no	Optional performance stack
