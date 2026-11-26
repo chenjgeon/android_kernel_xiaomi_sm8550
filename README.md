@@ -10,7 +10,7 @@ a fresh checkout and publishes an AnyKernel3 ZIP.
 | Group | Implementation |
 |---|---|
 | KernelSU-Next | `KernelSU-Next/KernelSU-Next` @ `3660779e` (dev tip tracked by the upstream 5.15 recipe), linked into `drivers/kernelsu` |
-| SUSFS4KSU | `simonpunk/susfs4ksu` @ `c1d1da42` on `gki-android13-5.15`; 5.15 `i_user_ns` compat + credential-helper guard |
+| SUSFS4KSU | `simonpunk/susfs4ksu` @ `c1d1da42` on `gki-android13-5.15`; 5.15 `i_user_ns` compat + credential-helper guard. `sus_map` comes from KernelSU-Next's built-in `kernel/susfs/sus_map.c`, so the standalone `xx_maps_sus_kernel.patch` is intentionally not applied. |
 | NoMount | `maxsteeel/nomount` @ `c803cbf0`; `fs/nomount` symlink + `CONFIG_NOMOUNT=y` |
 | Mountify | userspace companion (not kernel-side; install the module on device) |
 | Baseband Guard | `vc-teahouse/Baseband-guard` @ `48d9fde`; LSM enabled with `baseband_guard` in `CONFIG_LSM` |
