@@ -49,8 +49,12 @@ if [ -s "$WORKSPACE/fuse-bpf.fragment" ]; then
 fi
 
 echo "[*] merging fragments"
+# Merge onto the generated gki_defconfig .config, not onto the vendor fragment:
+# merge_config.sh uses its first argument as the base file. Passing the vendor
+# fragment as the base discarded every gki_defconfig value (including KPROBES,
+# which KernelSU depends on).
 KCONFIG_CONFIG="$OUT_DIR/.config" \
-  "$KERNEL_ROOT/scripts/kconfig/merge_config.sh" -m -r -y "${FRAGMENTS[@]}"
+  "$KERNEL_ROOT/scripts/kconfig/merge_config.sh" -m -r -y "$OUT_DIR/.config" "${FRAGMENTS[@]}"
 
 echo "[*] resolving dependencies with olddefconfig"
 make "${MAKE_ARGS[@]}" olddefconfig
