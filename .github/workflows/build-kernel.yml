@@ -12,6 +12,10 @@ on:
         type: boolean
         required: false
         default: true
+      susfs_commit:
+        description: 'Override SUSFS commit pin (blank = use repository pin)'
+        required: false
+        default: ''
   push:
     tags:
       - 'v*'
@@ -32,6 +36,7 @@ env:
   OUT_DIR: ${{ github.workspace }}/out
   TOOLCHAIN_DIR: ${{ github.workspace }}/toolchain
   APPLY_PERFORMANCE: ${{ github.event.inputs.apply_performance || 'true' }}
+  SUSFS_COMMIT: ${{ github.event.inputs.susfs_commit || '' }}
 
 jobs:
   build:
@@ -44,6 +49,14 @@ jobs:
         with:
           path: kernel
           fetch-depth: 1
+
+      - name: Check SUSFS update availability
+        id: susfs-check
+        run: |
+          bash "$CI_DIR/scripts/check-susfs-update.sh" \
+            --pin-file "$CI_DIR/scripts/apply-patches.sh" \
+            --doc-file "" \
+            --json "$GITHUB_WORKSPACE/susfs-update.json"
 
       - name: Install build dependencies
         run: |
@@ -156,6 +169,7 @@ jobs:
           name: vermeer-kernel-${{ github.run_number }}
           path: |
             ${{ github.workspace }}/release/*
+            ${{ github.workspace }}/susfs-update.json
           if-no-files-found: error
 
       - name: Create GitHub Release

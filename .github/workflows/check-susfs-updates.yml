@@ -1,0 +1,183 @@
+name: Check SUSFS updates
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+    inputs:
+      open_pr:
+        description: 'Open or refresh a PR when an update is available'
+        type: boolean
+        required: false
+        default: true
+      open_issue:
+        description: 'Open or refresh an issue when an update is available'
+        type: boolean
+        required: false
+        default: true
+      dispatch_build:
+        description: 'Dispatch build-kernel.yml with the latest SUSFS pin'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: write
+
+concurrency:
+  group: susfs-update-check
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for SUSFS updates
+        id: check
+        run: |
+          bash ci/scripts/check-susfs-update.sh \
+            --pin-file ci/scripts/apply-patches.sh \
+            --doc-file README.md \
+            --json susfs-update.json
+
+      - name: Apply SUSFS pin update locally
+        if: steps.check.outputs.update_available == 'true'
+        run: |
+          bash ci/scripts/check-susfs-update.sh \
+            --pin-file ci/scripts/apply-patches.sh \
+            --doc-file README.md \
+            --update
+
+      - name: Write job summary
+        run: |
+          {
+            echo "### SUSFS update check"
+            echo ""
+            echo "- Branch: \`${{ steps.check.outputs.branch }}\`"
+            echo "- Pinned: \`${{ steps.check.outputs.pinned_sha }}\`"
+            echo "- Latest: \`${{ steps.check.outputs.latest_sha }}\`"
+            echo "- SUSFS version: \`${{ steps.check.outputs.susfs_version }}\`"
+            echo "- Update available: \`${{ steps.check.outputs.update_available }}\`"
+            echo "- API error: \`${{ steps.check.outputs.check_error }}\`"
+            if [ -n "${{ steps.check.outputs.latest_url }}" ]; then
+              echo "- Commit: ${{ steps.check.outputs.latest_url }}"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Open or refresh pull request
+        if: >-
+          steps.check.outputs.update_available == 'true' &&
+          (github.event_name == 'schedule' || github.event.inputs.open_pr == 'true')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LATEST_SHA: ${{ steps.check.outputs.latest_sha }}
+          PINNED_SHA: ${{ steps.check.outputs.pinned_sha }}
+          LATEST_TITLE: ${{ steps.check.outputs.latest_title }}
+          LATEST_URL: ${{ steps.check.outputs.latest_url }}
+          SUSFS_VERSION: ${{ steps.check.outputs.susfs_version }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          SHORT="${LATEST_SHA:0:12}"
+          BRANCH="susfs-pin-${SHORT}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH"
+          git add ci/scripts/apply-patches.sh README.md
+          if ! git diff --cached --quiet; then
+            git commit -m "ci: bump SUSFS pin to ${SHORT}"
+          fi
+          git push --force origin "HEAD:${BRANCH}"
+
+          BODY=$(cat <<EOF
+          Automated SUSFS pin update.
+
+          - Version: \`${SUSFS_VERSION}\`
+          - Old pin: \`${PINNED_SHA}\`
+          - New pin: \`${LATEST_SHA}\`
+          - Commit: ${LATEST_TITLE}
+          - URL: ${LATEST_URL}
+
+          After merging, dispatch \`build-kernel.yml\` to produce a kernel with this pin.
+          EOF
+          )
+
+          if gh pr view "$BRANCH" >/dev/null 2>&1; then
+            gh pr comment "$BRANCH" --body "SUSFS pin update refreshed to \`${SHORT}\`."
+          else
+            gh pr create \
+              --base "$BASE_BRANCH" \
+              --head "$BRANCH" \
+              --title "CI: bump SUSFS pin to ${SHORT}" \
+              --body "$BODY"
+          fi
+
+      - name: Open or refresh issue
+        if: >-
+          steps.check.outputs.update_available == 'true' &&
+          (github.event_name == 'schedule' || github.event.inputs.open_issue == 'true')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LATEST_SHA: ${{ steps.check.outputs.latest_sha }}
+          PINNED_SHA: ${{ steps.check.outputs.pinned_sha }}
+          LATEST_TITLE: ${{ steps.check.outputs.latest_title }}
+          LATEST_URL: ${{ steps.check.outputs.latest_url }}
+          SUSFS_VERSION: ${{ steps.check.outputs.susfs_version }}
+        run: |
+          set -euo pipefail
+          TITLE="SUSFS update available: ${LATEST_SHA:0:12}"
+          BODY=$(cat <<EOF
+          A newer SUSFS commit is available on branch \`${{ steps.check.outputs.branch }}\`.
+
+          - Version: \`${SUSFS_VERSION}\`
+          - Pinned: \`${PINNED_SHA}\`
+          - Latest: \`${LATEST_SHA}\`
+          - Commit: ${LATEST_TITLE}
+          - URL: ${LATEST_URL}
+
+          You can:
+          1. Merge the automatically opened pin-update PR, or
+          2. Dispatch \`build-kernel.yml\` with \`susfs_commit=${LATEST_SHA}\` to test without merging.
+          EOF
+          )
+          NUM="$(gh issue list --state open --search 'SUSFS update available in:title' --json number --jq '.[0].number // empty')"
+          if [ -n "$NUM" ]; then
+            gh issue comment "$NUM" --body "$BODY"
+          else
+            gh issue create --title "$TITLE" --body "$BODY"
+          fi
+
+      - name: Dispatch build with latest SUSFS
+        if: >-
+          steps.check.outputs.update_available == 'true' &&
+          github.event_name == 'workflow_dispatch' &&
+          github.event.inputs.dispatch_build == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LATEST_SHA: ${{ steps.check.outputs.latest_sha }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          gh workflow run build-kernel.yml \
+            --ref "$BASE_BRANCH" \
+            -f "release_tag=vermeer-susfs-${LATEST_SHA:0:12}" \
+            -f "susfs_commit=${LATEST_SHA}" \
+            -f "apply_performance=true"
+
+      - name: Upload check report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: susfs-update-report
+          path: susfs-update.json
+          if-no-files-found: ignore
