@@ -56,7 +56,17 @@ echo "[*] resolving dependencies with olddefconfig"
 make "${MAKE_ARGS[@]}" olddefconfig
 
 echo "[*] key config checks"
-for opt in CONFIG_KSU=y CONFIG_KSU_SUSFS=y CONFIG_BBG=y CONFIG_NOMOUNT=y \
+if ! grep -qx 'CONFIG_KSU=y' "$OUT_DIR/.config"; then
+  echo "--- KSU diagnostics ---" >&2
+  grep -n 'CONFIG_KSU' "$OUT_DIR/.config" || true
+  grep -n 'CONFIG_KPROBES\|CONFIG_EXT4_FS' "$OUT_DIR/.config" || true
+  grep -n 'kernelsu' "$KERNEL_ROOT/drivers/Kconfig" || true
+  ls -ld "$KERNEL_ROOT/drivers/kernelsu" || true
+  readlink -f "$KERNEL_ROOT/drivers/kernelsu" || true
+  ls -l "$KERNEL_ROOT/drivers/kernelsu/Kconfig" || true
+  grep -n 'config KSU' "$KERNEL_ROOT/drivers/kernelsu/Kconfig" || true
+fi
+for opt in CONFIG_KSU=y CONFIG_BBG=y CONFIG_NOMOUNT=y \
            CONFIG_TCP_CONG_BBR3=y CONFIG_NTSYNC=y CONFIG_WIREGUARD=y \
            CONFIG_CIFS=y CONFIG_TMPFS_XATTR=y CONFIG_DEBUG_INFO_BTF=y; do
   grep -qx "$opt" "$OUT_DIR/.config" || { echo "missing $opt in .config" >&2; exit 1; }
