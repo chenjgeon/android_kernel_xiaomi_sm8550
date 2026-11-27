@@ -201,7 +201,7 @@ clone_pinned "$SUSFS_REPO" "$SUSFS_COMMIT" "$SUSFS_DIR" "$SUSFS_BRANCH"
 
 cp -a "$SUSFS_DIR/kernel_patches/fs/." "$KERNEL_ROOT/fs/"
 cp -a "$SUSFS_DIR/kernel_patches/include/linux/." "$KERNEL_ROOT/include/linux/"
-SUSFS_PATCH="$SUSFS_DIR/kernel_patches/50_add_susfs_in_gki-${SUSFS_BRANCH}.patch"
+SUSFS_PATCH="$SUSFS_DIR/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
 [ -f "$SUSFS_PATCH" ] || die "missing SUSFS patch $SUSFS_PATCH"
 cp "$SUSFS_PATCH" "$WORKSPACE/susfs-base.patch"
 apply_patch "susfs-base" "$WORKSPACE/susfs-base.patch" 1 3 yes
