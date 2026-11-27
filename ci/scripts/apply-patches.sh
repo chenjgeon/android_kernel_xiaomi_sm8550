@@ -18,8 +18,14 @@ case "$APPLY_PERFORMANCE" in
 esac
 
 # Upstream pins used by the proven 5.15 recipes.
-KSU_REPO="https://github.com/KernelSU-Next/KernelSU-Next.git"
-KSU_COMMIT="${KSU_COMMIT:-3660779ea2e2fe1adb27616d8aad9ffaad717501}"
+# WildKernels builds SUSFS-enabled "next" kernels from pershoot's dev-susfs
+# fork: upstream KernelSU-Next has no CONFIG_KSU_SUSFS Kconfig, so every
+# CONFIG_KSU_SUSFS* entry is silently dropped by olddefconfig and the kernel
+# ends up with zero susfs symbols. The fork carries the Kconfig declarations
+# and the kernel-side SUSFS glue.
+KSU_REPO="https://github.com/pershoot/KernelSU-Next.git"
+KSU_BRANCH="dev-susfs"
+KSU_COMMIT="${KSU_COMMIT:-e726c5982c40c94cc14dce82698b169341843ec6}"
 SUSFS_REPO="https://gitlab.com/simonpunk/susfs4ksu.git"
 SUSFS_BRANCH="gki-android13-5.15"
 SUSFS_COMMIT="${SUSFS_COMMIT:-c1d1da42b74771944207ec45aaceff9c57e84985}"
@@ -179,10 +185,12 @@ clone_pinned() {
 }
 
 KSU_DIR="$WORKSPACE/KernelSU-Next"
-clone_pinned "$KSU_REPO" "$KSU_COMMIT" "$KSU_DIR" dev
+clone_pinned "$KSU_REPO" "$KSU_COMMIT" "$KSU_DIR" "$KSU_BRANCH"
 
 [ -f "$KSU_DIR/kernel/Kconfig" ] && [ -f "$KSU_DIR/kernel/Makefile" ] || \
   die "KernelSU-Next checkout has no kernel/ integration"
+grep -q '^config KSU_SUSFS$' "$KSU_DIR/kernel/Kconfig" || \
+  die "KSU checkout $KSU_COMMIT has no KSU_SUSFS Kconfig - CONFIG_KSU_SUSFS* would be dropped; use pershoot dev-susfs"
 ln -sfn "$(realpath --relative-to="$KERNEL_ROOT/drivers" "$KSU_DIR/kernel")" "$KERNEL_ROOT/drivers/kernelsu"
 grep -q 'obj-$(CONFIG_KSU) += kernelsu/' "$KERNEL_ROOT/drivers/Makefile" || \
   printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> "$KERNEL_ROOT/drivers/Makefile"
@@ -199,6 +207,20 @@ fi
 SUSFS_DIR="$WORKSPACE/susfs4ksu"
 clone_pinned "$SUSFS_REPO" "$SUSFS_COMMIT" "$SUSFS_DIR" "$SUSFS_BRANCH"
 
+# WildKernels' "next" flavor cherry-picks two pershoot fs/susfs.c fixes onto
+# the susfs4ksu checkout before copying the sources into the kernel:
+#   6387756 fs/susfs: Allow core to be built with no features
+#   161c058 fs/susfs: Implement SuSFS and Toolkit coexistence
+for fix in 6387756d64b3ab9ececefc4523627a9ee05a7519 \
+           161c058fed5544a6573d87124f346dadd5c4962d; do
+  if ! git -C "$SUSFS_DIR" cat-file -e "${fix}^{commit}" 2>/dev/null; then
+    retry git -C "$SUSFS_DIR" fetch https://gitlab.com/pershoot/susfs4ksu.git "$fix"
+  fi
+  log "cherry-picking pershoot SUSFS fix $fix"
+  git -C "$SUSFS_DIR" cherry-pick --no-edit "$fix" || \
+    die "failed to cherry-pick pershoot SUSFS fix $fix"
+done
+
 cp -a "$SUSFS_DIR/kernel_patches/fs/." "$KERNEL_ROOT/fs/"
 cp -a "$SUSFS_DIR/kernel_patches/include/linux/." "$KERNEL_ROOT/include/linux/"
 SUSFS_PATCH="$SUSFS_DIR/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
@@ -210,6 +232,11 @@ for helper in susfs_idmap_compat.py susfs_guard_priority_helpers.py; do
   [ -f "$ADDITIONS/scripts/compat/$helper" ] || die "missing compat helper $helper"
   python3 "$ADDITIONS/scripts/compat/$helper" "$KERNEL_ROOT/fs/susfs.c"
 done
+# With CONFIG_KSU_SUSFS* actually enabled, the SUSFS patch widens show_fdinfo()
+# but leaves fanotify_fdinfo() at two arguments -> -Werror when FANOTIFY=y.
+[ -f "$ADDITIONS/scripts/compat/susfs_fdinfo_fanotify_arity.py" ] || \
+  die "missing compat helper susfs_fdinfo_fanotify_arity.py"
+python3 "$ADDITIONS/scripts/compat/susfs_fdinfo_fanotify_arity.py" "$KERNEL_ROOT"
 
 # ---------------------------------------------------------------------------
 # 4. NoMount.
