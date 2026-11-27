@@ -153,11 +153,18 @@ if [ -n "$JSON_OUT" ]; then
   LATEST_TITLE="$LATEST_TITLE" LATEST_URL="$LATEST_URL" LATEST_DATE="$LATEST_DATE" \
   BRANCH="$PINNED_BRANCH" python3 - "$JSON_OUT" <<'PY'
 import json, os, sys
-keys = [
-    "check_error", "update_available", "pinned_sha", "latest_sha",
-    "susfs_version", "latest_title", "latest_url", "latest_date", "branch"
-]
-data = {k: os.environ.get(k, "") for k in keys}
+env_map = {
+    "check_error": "CHECK_ERROR",
+    "update_available": "UPDATE_AVAILABLE",
+    "pinned_sha": "PINNED_SHA",
+    "latest_sha": "LATEST_SHA",
+    "susfs_version": "SUSFS_VERSION",
+    "latest_title": "LATEST_TITLE",
+    "latest_url": "LATEST_URL",
+    "latest_date": "LATEST_DATE",
+    "branch": "BRANCH",
+}
+data = {key: os.environ.get(env, "") for key, env in env_map.items()}
 with open(sys.argv[1], "w", encoding="utf-8") as f:
     json.dump(data, f, indent=2)
     f.write("\n")
