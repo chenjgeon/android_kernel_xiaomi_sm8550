@@ -23,6 +23,12 @@ ADDITIONS="$(cd "$ADDITIONS" && pwd)"
 [ -n "$OUT_DIR" ] || OUT_DIR="$WORKSPACE/out"
 mkdir -p "$OUT_DIR"
 
+# kconfig's host tools are built with ld.lld when LLVM=1, so the Clang binutils
+# must be on PATH for gki_defconfig/olddefconfig as well as for the kernel build.
+if [ -n "${CLANG_BIN:-}" ]; then
+  export PATH="$CLANG_BIN:${BINUTILS_BIN:-/usr/bin}:$PATH"
+fi
+
 VENDOR_CONFIG="$KERNEL_ROOT/arch/arm64/configs/vendor/vermeer_GKI.config"
 [ -f "$VENDOR_CONFIG" ] || { echo "missing $VENDOR_CONFIG" >&2; exit 1; }
 
