@@ -9,8 +9,8 @@ a fresh checkout and publishes an AnyKernel3 ZIP.
 
 | Group | Implementation |
 |---|---|
-| KernelSU-Next | `KernelSU-Next/KernelSU-Next` @ `3660779e` (dev tip tracked by the upstream 5.15 recipe), linked into `drivers/kernelsu` |
-| SUSFS4KSU | `simonpunk/susfs4ksu` @ `c1d1da42` on `gki-android13-5.15`; 5.15 `i_user_ns` compat + credential-helper guard. `sus_map` comes from KernelSU-Next's built-in `kernel/susfs/sus_map.c`, so the standalone `xx_maps_sus_kernel.patch` is intentionally not applied. |
+| KernelSU-Next | `pershoot/KernelSU-Next` `dev-susfs` @ `e726c598` — the SUSFS-capable fork used by WildKernels; linked into `drivers/kernelsu` |
+| SUSFS4KSU | `simonpunk/susfs4ksu` @ `c1d1da42` on `gki-android13-5.15` + pershoot's two `fs/susfs.c` fixes; 5.15 `i_user_ns`/credential-helper/fanotify compat. Declares `CONFIG_KSU_SUSFS*` and builds `SUSFS_VERSION v2.4.0`. The standalone `xx_maps_sus_kernel.patch` is intentionally not applied. |
 | NoMount | `maxsteeel/nomount` @ `c803cbf0`; `fs/nomount` symlink + `CONFIG_NOMOUNT=y` |
 | Mountify | userspace companion (not kernel-side; install the module on device) |
 | Baseband Guard | `vc-teahouse/Baseband-guard` @ `48d9fde`; LSM enabled with `baseband_guard` in `CONFIG_LSM` |
@@ -55,7 +55,8 @@ Trigger the workflow from the Actions tab ("Run workflow"), or push a `v*` tag.
 - The patch recipes come from `WildKernels/kernel_patches` / `GKI_KernelSU_SUSFS`. Upstream's 5.15 matrix stops before sublevel **223**, so context drift is possible. Required patches are applied with `--fuzz=3` and fail the job on rejects; fix the affected patch or adjust the manifest line if that happens.
 - The AnyKernel3 script intentionally patches **boot only**. Keep vendor_boot (DTBs/modules/ramdisk) from your ROM. Verify offsets on-device before flashing.
 - `CONFIG_LSM` changes and GKI KMI symbol changes may break vendor module loading on some ROMs. Test on a disposable slot with a backup.
-- No local kernel build was performed while preparing these files (Windows host, no Linux build environment). Validate the first CI run carefully.
+- The SUSFS-enabled build was verified in CI (`vermeer-10`): `CONFIG_KSU_SUSFS=y`, 131 `susfs_*` symbols in `System.map`, and `SUSFS_VERSION: v2.4.0` in the build log. On-device boot/root behaviour still needs testing.
+- No local kernel build was performed while preparing these files (Windows host, no Linux build environment). Validate each CI run carefully.
 
 ## Updating pins
 
