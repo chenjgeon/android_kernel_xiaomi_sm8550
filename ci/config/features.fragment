@@ -2,6 +2,13 @@
 # Merged on top of gki_defconfig + arch/arm64/configs/vendor/vermeer_GKI.config.
 # merge_config.sh warns about symbols a tree does not declare; olddefconfig drops them.
 
+# --- CI build reliability ---
+# GKI's full LTO link did not finish before the hosted runner was shut down.
+# ThinLTO keeps CFI enabled but links in parallel and is much faster.
+CONFIG_LTO_CLANG_FULL=n
+CONFIG_LTO_CLANG_THIN=y
+CONFIG_CFI_CLANG=y
+
 # --- KernelSU-Next ---
 CONFIG_KSU=y
 CONFIG_KPROBES=y
